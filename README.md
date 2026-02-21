@@ -1,224 +1,79 @@
-# 概要
-出勤管理サイト
-<img width="796" height="603" alt="スクリーンショット 2026-02-21 18 36 39" src="https://github.com/user-attachments/assets/afc07e01-3b53-4689-88d8-f483d33c2474" />
+# 出勤管理サイト
 
-# 技術
+出勤・退勤の打刻と、その日の勤怠サマリーを確認するための Web アプリです。
+
+## 技術スタック
 - 言語: TypeScript
-- フレームワーク: Tanstack Start(React)
+- フレームワーク: TanStack Start（React）
 - 関数型プログラミング: Effect.ts
-- テスト: Vitest React Testing Library Playwright
+- テスト: Vitest / React Testing Library / Playwright
 - インフラ: Cloudflare
 
-Welcome to your new TanStack Start app! 
+## ディレクトリ構造
 
-# Getting Started
+```text
+.
+├── public/                         # 静的アセット（favicon, manifest など）
+├── src/
+│   ├── components/                 # アプリ全体で使う共通 UI コンポーネント
+│   ├── features/
+│   │   └── attendance/             # 勤怠機能（機能単位で責務を分割）
+│   │       ├── application/        # ユースケース層（ドメインを使って処理を組み立てる）
+│   │       │   ├── server-fns/     # クライアントから呼び出すサーバー関数
+│   │       │   └── services/       # アプリケーションサービス（打刻などの処理本体）
+│   │       ├── domain/             # 業務ルールの中心（フレームワーク非依存）
+│   │       │   ├── entities/       # エンティティ（AttendanceEvent / AttendanceDay など）
+│   │       │   ├── logic/          # ドメインロジック（集計・判定ルール）
+│   │       │   └── ports/          # 外部依存の抽象（Repository / Clock のインターフェース）
+│   │       ├── infrastructure/     # 外部依存の実装（DB・システム時計など）
+│   │       │   ├── clock/          # Clock ポートの実装
+│   │       │   └── db/             # Repository ポートの実装
+│   │       └── presentation/       # 画面表示や操作に関する層
+│   │           ├── hooks/          # UI から使うカスタムフック
+│   │           └── parts/          # 勤怠画面の部品コンポーネント
+│   ├── lib/                        # 汎用ユーティリティ（Effect 設定・共通関数）
+│   ├── routes/                     # TanStack Router のルート定義
+│   ├── router.tsx                  # ルーター初期化
+│   ├── routeTree.gen.ts            # ルート定義の自動生成ファイル
+│   └── styles.css                  # 全体スタイル
+├── tests/
+│   └── e2e/                        # Playwright による E2E テスト
+├── biome.json                      # Lint/Format 設定
+├── playwright.config.ts            # E2E テスト設定
+├── vite.config.ts                  # Vite / TanStack Start 設定
+└── wrangler.jsonc                  # Cloudflare デプロイ設定
+```
 
-To run this application:
+## 各層の役割（attendance 機能）
+
+### domain
+- **何を置くか**: 業務ルールそのもの（例: 出勤/退勤イベントの整合性、当日サマリー算出）。
+- **目的**: フレームワークや DB の都合から独立させ、仕様変更に強くする。
+- **ポイント**: `ports` で外部依存を抽象化し、純粋なロジックを保つ。
+
+### application
+- **何を置くか**: ユースケース単位の処理（「打刻する」「今日の状態を取得する」など）。
+- **目的**: domain のルールを使って、実行フローを組み立てる。
+- **ポイント**: 直接インフラ詳細に依存せず、`domain/ports` 経由で利用する。
+
+### infrastructure
+- **何を置くか**: DB・時刻取得など、外部システムに触る実装。
+- **目的**: domain/application から技術詳細を隔離する。
+- **ポイント**: `domain/ports` の実装をここで提供し、差し替え可能にする。
+
+### presentation
+- **何を置くか**: 画面コンポーネント、フック、表示用の組み立て。
+- **目的**: UI の関心事（表示・操作）を他層から分離する。
+- **ポイント**: 可能な限り application を呼び出すだけにして、業務ルールは domain に寄せる。
+
+## 開発コマンド
 
 ```bash
 pnpm install
 pnpm dev
-```
-
-# Building For Production
-
-To build this application for production:
-
-```bash
 pnpm build
-```
-
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
-
-```bash
 pnpm test
-```
-
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `pnpm add @tailwindcss/vite tailwindcss --dev`
-
-## Linting & Formatting
-
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
-
-
-```bash
 pnpm lint
 pnpm format
 pnpm check
 ```
-
-
-## Shadcn
-
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
-
-```bash
-pnpm dlx shadcn@latest add button
-```
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
