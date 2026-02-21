@@ -30,4 +30,17 @@ describe("aggregateDay", () => {
 		expect(summary.openState).toBe("OFF_DUTY");
 		expect(summary.issues).toHaveLength(0);
 	});
+
+	it("shows working state and single clock-in event before clock-out", () => {
+		const events = [
+			event({ type: "CLOCK_IN", at: "2026-02-21T01:00:00.000Z" }),
+		];
+
+		const summary = aggregateDay("2026-02-21", events);
+
+		expect(summary.openState).toBe("WORKING");
+		expect(summary.totalWorkMinutes).toBe(0);
+		expect(summary.events).toHaveLength(1);
+		expect(summary.events[0]?.type).toBe("CLOCK_IN");
+	});
 });
