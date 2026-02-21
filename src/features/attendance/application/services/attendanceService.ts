@@ -1,4 +1,8 @@
-import type { AttendanceEventType } from "../../domain/entities/attendanceEvent";
+import { Effect } from "../../../../lib/effect";
+import type {
+	AttendanceEvent,
+	AttendanceEventType,
+} from "../../domain/entities/attendanceEvent";
 import { aggregateDay } from "../../domain/logic/aggregate";
 import {
 	ensureCanBreakEnd,
@@ -20,29 +24,65 @@ type MutateInput = Deps & {
 	requestId: string;
 };
 
-async function mutateAttendance(input: MutateInput) {
-	const at = input.clock.now().toISOString();
-	const dayKey = input.clock.todayKey();
-	const events = await input.repo.listEventsForDay(input.userId, dayKey);
-
-	if (events.some((event) => event.requestId === input.requestId)) {
-		return { ok: true, inserted: false };
+function validateEventTransition(
+	type: AttendanceEventType,
+	events: AttendanceEvent[],
+) {
+	switch (type) {
+		case "CLOCK_IN":
+			ensureCanClockIn(events);
+			break;
+		case "CLOCK_OUT":
+			ensureCanClockOut(events);
+			break;
+		case "BREAK_START":
+			ensureCanBreakStart(events);
+			break;
+		case "BREAK_END":
+			ensureCanBreakEnd(events);
+			break;
 	}
+}
 
-	if (input.type === "CLOCK_IN") ensureCanClockIn(events);
-	if (input.type === "CLOCK_OUT") ensureCanClockOut(events);
-	if (input.type === "BREAK_START") ensureCanBreakStart(events);
-	if (input.type === "BREAK_END") ensureCanBreakEnd(events);
+function mutateAttendance(input: MutateInput) {
+	const prepareEffect = Effect.sync(() => ({
+		at: input.clock.now().toISOString(),
+		dayKey: input.clock.todayKey(),
+	}));
 
-	const inserted = await input.repo.appendEventIfNew({
-		userId: input.userId,
-		dayKey,
-		type: input.type,
-		at,
-		requestId: input.requestId,
+	const mutationEffect = Effect.flatMap(prepareEffect, ({ at, dayKey }) => {
+		const listEventsEffect = Effect.tryPromise(() =>
+			input.repo.listEventsForDay(input.userId, dayKey),
+		);
+
+		return Effect.flatMap(listEventsEffect, (events) => {
+			if (events.some((event) => event.requestId === input.requestId)) {
+				return Effect.succeed({ ok: true as const, inserted: false });
+			}
+
+			const validateEffect = Effect.sync(() =>
+				validateEventTransition(input.type, events),
+			);
+			const appendEffect = Effect.flatMap(validateEffect, () =>
+				Effect.tryPromise(() =>
+					input.repo.appendEventIfNew({
+						userId: input.userId,
+						dayKey,
+						type: input.type,
+						at,
+						requestId: input.requestId,
+					}),
+				),
+			);
+
+			return Effect.map(appendEffect, (inserted) => ({
+				ok: true as const,
+				inserted,
+			}));
+		});
 	});
 
-	return { ok: true, inserted };
+	return Effect.runPromise(mutationEffect);
 }
 
 export function clockIn(input: Deps & { requestId: string }) {
@@ -61,8 +101,16 @@ export function breakEnd(input: Deps & { requestId: string }) {
 	return mutateAttendance({ ...input, type: "BREAK_END" });
 }
 
-export async function getTodaySummary(input: Deps) {
-	const dayKey = input.clock.todayKey();
-	const events = await input.repo.listEventsForDay(input.userId, dayKey);
-	return aggregateDay(dayKey, events);
+export function getTodaySummary(input: Deps) {
+	const dayKeyEffect = Effect.sync(() => input.clock.todayKey());
+	const summaryEffect = Effect.flatMap(dayKeyEffect, (dayKey) => {
+		const listEventsEffect = Effect.tryPromise(() =>
+			input.repo.listEventsForDay(input.userId, dayKey),
+		);
+		return Effect.map(listEventsEffect, (events) =>
+			aggregateDay(dayKey, events),
+		);
+	});
+
+	return Effect.runPromise(summaryEffect);
 }
