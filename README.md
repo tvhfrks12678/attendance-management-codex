@@ -1,3 +1,14 @@
+# 概要
+出勤管理サイト
+<img width="796" height="603" alt="スクリーンショット 2026-02-21 18 36 39" src="https://github.com/user-attachments/assets/afc07e01-3b53-4689-88d8-f483d33c2474" />
+
+# 技術
+- 言語: TypeScript
+- フレームワーク: Tanstack Start(React)
+- 関数型プログラミング: Effect.ts
+- テスト: Vitest React Testing Library Playwright
+- インフラ: Cloudflare
+
 Welcome to your new TanStack Start app! 
 
 # Getting Started
